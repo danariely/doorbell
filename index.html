@@ -92,6 +92,7 @@
 
     var ping = fetch("https://ntfy.sh/" + NTFY_TOPIC, {
       method: "POST",
+      keepalive: true, // survive the navigation to the video room
       body: "מישהו בדלת! Someone is at the door 🚪",
       headers: {
         "Title": "Doorbell - someone is at the door",
