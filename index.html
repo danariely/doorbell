@@ -67,7 +67,7 @@
   <button id="ring">אני בדלת &nbsp;·&nbsp; I'm at the door</button>
   <p class="hint">
     לחיצה תשלח התראה ותפתח שיחת וידאו — אנא אשרו גישה למצלמה.<br>
-    Tapping sends an alert and opens a video call — please allow camera access.
+    <span dir="ltr">Tapping sends an alert and opens a video call — please allow camera access.</span>
   </p>
   <p id="status"></p>
 </main>
@@ -82,13 +82,13 @@
     '&config.prejoinConfig.enabled=false';
 
   var btn = document.getElementById("ring");
-  var status = document.getElementById("status");
+  var statusEl = document.getElementById("status");
   var bell = document.getElementById("bellIcon");
 
   btn.addEventListener("click", function () {
     btn.disabled = true;
     bell.classList.add("ringing");
-    status.textContent = "מצלצל… Ringing…";
+    statusEl.textContent = "מצלצל… Ringing…";
 
     var ping = fetch("https://ntfy.sh/" + NTFY_TOPIC, {
       method: "POST",
@@ -104,7 +104,7 @@
     // Give the ping a moment to leave, then move to the video room.
     Promise.race([ping, new Promise(function (r) { setTimeout(r, 1500); })])
       .then(function () {
-        status.textContent = "פותח שיחת וידאו… Opening video call…";
+        statusEl.textContent = "פותח שיחת וידאו… Opening video call…";
         window.location.href = VISITOR_URL;
       });
   });
