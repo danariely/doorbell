@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>🔔 פעמון הדלת · Doorbell</title>
+<style>
+  :root {
+    --bg: #10141a;
+    --card: #1a2029;
+    --text: #f2f4f7;
+    --muted: #9aa4b2;
+    --accent: #e8b931;
+    --accent-press: #c99e1f;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Heebo", Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh; min-height: 100dvh;
+    display: flex; align-items: center; justify-content: center;
+    padding: 24px;
+  }
+  main {
+    width: 100%; max-width: 420px;
+    background: var(--card);
+    border-radius: 24px;
+    padding: 40px 28px 32px;
+    text-align: center;
+    box-shadow: 0 12px 40px rgba(0,0,0,.45);
+  }
+  .bell { font-size: 64px; line-height: 1; }
+  h1 { font-size: 30px; margin-top: 16px; font-weight: 700; }
+  .sub { color: var(--muted); font-size: 17px; margin-top: 4px; }
+  button {
+    margin-top: 28px;
+    width: 100%;
+    font-size: 22px; font-weight: 700;
+    font-family: inherit;
+    padding: 20px 16px;
+    border: none; border-radius: 16px;
+    background: var(--accent); color: #14170c;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  button:active { background: var(--accent-press); transform: scale(.985); }
+  button:disabled { opacity: .55; }
+  .hint { color: var(--muted); font-size: 14px; line-height: 1.6; margin-top: 20px; }
+  #status { margin-top: 18px; font-size: 18px; min-height: 26px; font-weight: 600; }
+  .ringing { animation: swing 1s ease-in-out infinite; display: inline-block; }
+  @keyframes swing {
+    0%,100% { transform: rotate(0); }
+    20% { transform: rotate(18deg); }
+    40% { transform: rotate(-14deg); }
+    60% { transform: rotate(9deg); }
+    80% { transform: rotate(-5deg); }
+  }
+</style>
+</head>
+<body>
+<main>
+  <div class="bell" id="bellIcon">🔔</div>
+  <h1>צלצלו בדלת</h1>
+  <p class="sub">Ring the doorbell</p>
+  <button id="ring">אני בדלת &nbsp;·&nbsp; I'm at the door</button>
+  <p class="hint">
+    לחיצה תשלח התראה ותפתח שיחת וידאו — אנא אשרו גישה למצלמה.<br>
+    Tapping sends an alert and opens a video call — please allow camera access.
+  </p>
+  <p id="status"></p>
+</main>
+<script>
+  // ── Configuration ─────────────────────────────────────────────
+  var NTFY_TOPIC = "studio-door-f474cd56";                 // ntfy.sh push topic (Dan's phone subscribes to this)
+  var ROOM_URL   = "https://meet.ffmuc.net/StudioDoor-f474cd56"; // anonymous Jitsi room (browser-based, no app)
+  // ──────────────────────────────────────────────────────────────
+
+  var VISITOR_URL = ROOM_URL +
+    '#userInfo.displayName=%22Visitor%20at%20the%20door%22' +
+    '&config.prejoinConfig.enabled=false';
+
+  var btn = document.getElementById("ring");
+  var status = document.getElementById("status");
+  var bell = document.getElementById("bellIcon");
+
+  btn.addEventListener("click", function () {
+    btn.disabled = true;
+    bell.classList.add("ringing");
+    status.textContent = "מצלצל… Ringing…";
+
+    var ping = fetch("https://ntfy.sh/" + NTFY_TOPIC, {
+      method: "POST",
+      body: "מישהו בדלת! Someone is at the door 🚪",
+      headers: {
+        "Title": "Doorbell - someone is at the door",
+        "Priority": "urgent",
+        "Tags": "bell",
+        "Click": ROOM_URL
+      }
+    }).catch(function () { /* still open the room - the visitor should not be stranded */ });
+
+    // Give the ping a moment to leave, then move to the video room.
+    Promise.race([ping, new Promise(function (r) { setTimeout(r, 1500); })])
+      .then(function () {
+        status.textContent = "פותח שיחת וידאו… Opening video call…";
+        window.location.href = VISITOR_URL;
+      });
+  });
+</script>
+</body>
+</html>
