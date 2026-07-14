@@ -3,7 +3,7 @@
 A QR code on the door replaces the doorbell. A visitor scans it with any phone,
 taps one button, and two things happen:
 
-1. Dan's phone gets an **urgent push notification** ("Someone is at the door").
+1. Dan's phone gets an **urgent Pushover notification** ("Someone is at the door").
 2. The visitor lands in a **browser video room** — no app, no account, nothing installed.
 
 Dan taps the notification and joins the same room. Two-way video, answerable from
@@ -11,19 +11,24 @@ anywhere in the world. The visitor never sees Dan's phone number.
 
 **Live page:** https://danariely.github.io/doorbell/
 
-## One-time setup on Dan's phone (required, ~2 minutes)
+## Dan's phone setup (done 2026-07-14)
 
-1. Install the **ntfy** app (App Store / Google Play — free, no account).
-2. In ntfy, tap **+ Subscribe to topic** and enter exactly: `studio-door-f474cd56`
-3. Allow notifications when asked. In the topic's settings, set notification
-   priority/sound to maximum so it behaves like a real doorbell.
-4. Optional but recommended: open https://meet.ffmuc.net once in Safari and allow
-   camera + microphone, so answering later is one tap instead of three.
+- **Primary ring: Pushover** (device `dan26iphone`). The page sends via the
+  "Doorbell" Pushover application (priority 1, persistent sound, with an
+  "Answer the door" link that opens the video room). ntfy delivery proved
+  unreliable on Dan's iPhone (messages arrived in-app, no notifications), so
+  Pushover replaced it.
+- **Backup channel: ntfy** topic `studio-door-f474cd56` — the page still pings
+  it; useful for debugging (`curl -s "https://ntfy.sh/studio-door-f474cd56/json?poll=1"`)
+  or as a second subscriber.
+- Optional but recommended: open https://meet.ffmuc.net once in Safari and allow
+  camera + microphone, so answering later is one tap instead of three.
 
 ## How answering works
 
-- Notification arrives → tap it → the video room opens in the browser →
-  allow camera → you're face-to-face with whoever is at the door.
+- Pushover notification arrives → open it and tap **"Answer the door (video)"**
+  → the video room opens in the browser → allow camera → you're face-to-face
+  with whoever is at the door.
 - Ignore the notification and nothing happens (the visitor waits alone in the
   room and gives up — like an unanswered doorbell).
 
@@ -34,7 +39,8 @@ anywhere in the world. The visitor never sees Dan's phone number.
 | `index.html` | The doorbell page (GitHub Pages, repo `danariely/doorbell`) |
 | `print-card.html` | Printable door card with the QR — open and print |
 | `qr-doorbell.png` | The bare QR code (points at the live page) |
-| ntfy topic `studio-door-f474cd56` | Free push channel via ntfy.sh |
+| Pushover app token `az4p…` + user key | Primary push (rotate at pushover.net if ever abused) |
+| ntfy topic `studio-door-f474cd56` | Backup push channel via ntfy.sh |
 | Jitsi room `StudioDoor-f474cd56` | Anonymous video room on meet.ffmuc.net |
 
 ## Design decisions & caveats
