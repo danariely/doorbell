@@ -73,7 +73,9 @@
 </main>
 <script>
   // ── Configuration ─────────────────────────────────────────────
-  var NTFY_TOPIC = "studio-door-f474cd56";                 // ntfy.sh push topic (Dan's phone subscribes to this)
+  var PUSHOVER_TOKEN = "az4p6qa6ei67we4o72xqvhse5s8tk5";   // Pushover app token ("Doorbell" application)
+  var PUSHOVER_USER  = "un4rggi89mo13kwzx79hzrwimqw9is";   // Dan's Pushover user key
+  var NTFY_TOPIC = "studio-door-f474cd56";                 // ntfy.sh backup channel
   var ROOM_URL   = "https://meet.ffmuc.net/StudioDoor-f474cd56"; // anonymous Jitsi room (browser-based, no app)
   // ──────────────────────────────────────────────────────────────
 
@@ -90,9 +92,29 @@
     bell.classList.add("ringing");
     statusEl.textContent = "מצלצל… Ringing…";
 
-    var ping = fetch("https://ntfy.sh/" + NTFY_TOPIC, {
+    // Primary ring: Pushover. Form-encoded body = simple request (no CORS
+    // preflight), no-cors = delivered even though the response is unreadable.
+    var pushover = fetch("https://api.pushover.net/1/messages.json", {
       method: "POST",
+      mode: "no-cors",
       keepalive: true, // survive the navigation to the video room
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        token: PUSHOVER_TOKEN,
+        user: PUSHOVER_USER,
+        title: "Doorbell - someone is at the door",
+        message: "מישהו בדלת! Someone is at the door 🚪",
+        priority: "1",
+        sound: "persistent",
+        url: ROOM_URL,
+        url_title: "Answer the door (video)"
+      }).toString()
+    }).catch(function () { /* still open the room - the visitor should not be stranded */ });
+
+    // Backup ring: ntfy (silent channel, kept for redundancy/debugging).
+    fetch("https://ntfy.sh/" + NTFY_TOPIC, {
+      method: "POST",
+      keepalive: true,
       body: "מישהו בדלת! Someone is at the door 🚪",
       headers: {
         "Title": "Doorbell - someone is at the door",
@@ -100,7 +122,9 @@
         "Tags": "bell",
         "Click": ROOM_URL
       }
-    }).catch(function () { /* still open the room - the visitor should not be stranded */ });
+    }).catch(function () {});
+
+    var ping = pushover;
 
     // Give the ping a moment to leave, then move to the video room.
     Promise.race([ping, new Promise(function (r) { setTimeout(r, 1500); })])
