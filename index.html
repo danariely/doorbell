@@ -13,6 +13,7 @@
     --muted: #9aa4b2;
     --accent: #e8b931;
     --accent-press: #c99e1f;
+    --ok: #4cc38a;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -35,7 +36,7 @@
   h1 { font-size: 30px; margin-top: 16px; font-weight: 700; }
   .sub { color: var(--muted); font-size: 17px; margin-top: 4px; }
   button {
-    margin-top: 28px;
+    margin-top: 24px;
     width: 100%;
     font-size: 22px; font-weight: 700;
     font-family: inherit;
@@ -48,7 +49,8 @@
   button:active { background: var(--accent-press); transform: scale(.985); }
   button:disabled { opacity: .55; }
   .hint { color: var(--muted); font-size: 14px; line-height: 1.6; margin-top: 20px; }
-  #status { margin-top: 18px; font-size: 18px; min-height: 26px; font-weight: 600; }
+  #status { margin-top: 18px; font-size: 19px; min-height: 28px; font-weight: 600; }
+  #status.ok { color: var(--ok); }
   .ringing { animation: swing 1s ease-in-out infinite; display: inline-block; }
   @keyframes swing {
     0%,100% { transform: rotate(0); }
@@ -57,6 +59,26 @@
     60% { transform: rotate(9deg); }
     80% { transform: rotate(-5deg); }
   }
+  /* optional extras, revealed after the ring */
+  #extras { display: none; margin-top: 26px; border-top: 1px solid #2a3240; padding-top: 22px; }
+  #extras.show { display: block; }
+  .extras-title { color: var(--muted); font-size: 15px; }
+  button.secondary {
+    margin-top: 14px;
+    font-size: 17px; font-weight: 600;
+    padding: 14px 16px;
+    background: #242c38; color: var(--text);
+  }
+  button.secondary:active { background: #1e2530; }
+  textarea {
+    margin-top: 14px;
+    width: 100%;
+    font-family: inherit; font-size: 16px;
+    background: #12171f; color: var(--text);
+    border: 1px solid #2a3240; border-radius: 12px;
+    padding: 12px; resize: none;
+  }
+  #photoInput { display: none; }
 </style>
 </head>
 <body>
@@ -65,79 +87,144 @@
   <h1>צלצלו בדלת</h1>
   <p class="sub">Ring the doorbell</p>
   <button id="ring">אני בדלת &nbsp;·&nbsp; I'm at the door</button>
-  <p class="hint">
-    לחיצה תשלח התראה ותפתח שיחת וידאו — אנא אשרו גישה למצלמה.<br>
-    <span dir="ltr">Tapping sends an alert and opens a video call — please allow camera access.</span>
+  <p class="hint" id="hint">
+    לחיצה תצלצל אצל דן בטלפון, איפה שלא יהיה.<br>
+    <span dir="ltr">Tapping rings Dan's phone, wherever he is.</span>
   </p>
   <p id="status"></p>
+
+  <div id="extras">
+    <p class="extras-title">
+      רוצים? אפשר לצרף תמונה או הודעה &nbsp;·&nbsp;
+      <span dir="ltr">Optionally add a photo or a note</span>
+    </p>
+    <button class="secondary" id="photoBtn">📷 צרפו תמונה · Add a photo</button>
+    <input type="file" id="photoInput" accept="image/*" capture="user">
+    <textarea id="note" rows="2" placeholder="הודעה קצרה… · A short note…"></textarea>
+    <button class="secondary" id="noteBtn">שלחו הודעה · Send note</button>
+  </div>
 </main>
 <script>
   // ── Configuration ─────────────────────────────────────────────
   var PUSHOVER_TOKEN = "az4p6qa6ei67we4o72xqvhse5s8tk5";   // Pushover app token ("Doorbell" application)
   var PUSHOVER_USER  = "un4rggi89mo13kwzx79hzrwimqw9is";   // Dan's Pushover user key
   var NTFY_TOPIC = "studio-door-f474cd56";                 // ntfy.sh backup channel
-  var ROOM_URL   = "https://meet.ffmuc.net/StudioDoor-f474cd56"; // anonymous Jitsi room (browser-based, no app)
   // ──────────────────────────────────────────────────────────────
-
-  var VISITOR_URL = ROOM_URL +
-    '#userInfo.displayName=%22Visitor%20at%20the%20door%22' +
-    '&config.prejoinConfig.enabled=false';
-
-  // Dan answers peephole-style: his camera starts OFF (he can enable it
-  // mid-call with the camera button); audio stays two-way.
-  var ANSWER_URL = ROOM_URL +
-    '#config.startWithVideoMuted=true' +
-    '&config.prejoinConfig.enabled=false';
 
   var btn = document.getElementById("ring");
   var statusEl = document.getElementById("status");
   var bell = document.getElementById("bellIcon");
+  var extras = document.getElementById("extras");
+  var photoBtn = document.getElementById("photoBtn");
+  var photoInput = document.getElementById("photoInput");
+  var noteBtn = document.getElementById("noteBtn");
+  var note = document.getElementById("note");
+
+  // Form-encoded body = simple request (no CORS preflight); no-cors = the
+  // request is delivered even though the response is unreadable.
+  function pushover(fields) {
+    var params = new URLSearchParams({
+      token: PUSHOVER_TOKEN,
+      user: PUSHOVER_USER,
+      priority: "1",
+      sound: "persistent"
+    });
+    for (var k in fields) params.set(k, fields[k]);
+    return fetch("https://api.pushover.net/1/messages.json", {
+      method: "POST",
+      mode: "no-cors",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: params.toString()
+    });
+  }
 
   btn.addEventListener("click", function () {
     btn.disabled = true;
     bell.classList.add("ringing");
     statusEl.textContent = "מצלצל… Ringing…";
 
-    // Primary ring: Pushover. Form-encoded body = simple request (no CORS
-    // preflight), no-cors = delivered even though the response is unreadable.
-    var pushover = fetch("https://api.pushover.net/1/messages.json", {
-      method: "POST",
-      mode: "no-cors",
-      keepalive: true, // survive the navigation to the video room
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        token: PUSHOVER_TOKEN,
-        user: PUSHOVER_USER,
-        title: "Doorbell - someone is at the door",
-        message: "מישהו בדלת! Someone is at the door 🚪",
-        priority: "1",
-        sound: "persistent",
-        url: ANSWER_URL,
-        url_title: "Answer the door (video)"
-      }).toString()
-    }).catch(function () { /* still open the room - the visitor should not be stranded */ });
+    var ping = pushover({
+      title: "Doorbell - someone is at the door",
+      message: "מישהו בדלת! Someone is at the door 🚪"
+    });
 
-    // Backup ring: ntfy (silent channel, kept for redundancy/debugging).
+    // Backup channel (silent, for redundancy/debugging).
     fetch("https://ntfy.sh/" + NTFY_TOPIC, {
       method: "POST",
-      keepalive: true,
       body: "מישהו בדלת! Someone is at the door 🚪",
-      headers: {
-        "Title": "Doorbell - someone is at the door",
-        "Priority": "urgent",
-        "Tags": "bell",
-        "Click": ANSWER_URL
-      }
+      headers: { "Title": "Doorbell - someone is at the door", "Priority": "urgent", "Tags": "bell" }
     }).catch(function () {});
 
-    var ping = pushover;
+    ping.then(function () {
+      statusEl.textContent = "✓ הפעמון צלצל · The bell rang";
+      statusEl.className = "ok";
+      bell.classList.remove("ringing");
+      extras.classList.add("show");
+    }).catch(function () {
+      statusEl.textContent = "משהו השתבש — נסו שוב · Something went wrong — try again";
+      btn.disabled = false;
+      bell.classList.remove("ringing");
+    });
+  });
 
-    // Give the ping a moment to leave, then move to the video room.
-    Promise.race([ping, new Promise(function (r) { setTimeout(r, 1500); })])
-      .then(function () {
-        statusEl.textContent = "פותח שיחת וידאו… Opening video call…";
-        window.location.href = VISITOR_URL;
-      });
+  // ── Optional photo: downscale on-device, send as Pushover attachment ──
+  photoBtn.addEventListener("click", function () { photoInput.click(); });
+
+  photoInput.addEventListener("change", function () {
+    var file = photoInput.files && photoInput.files[0];
+    if (!file) return;
+    photoBtn.disabled = true;
+    photoBtn.textContent = "שולח תמונה… Sending photo…";
+
+    var img = new Image();
+    img.onload = function () {
+      var MAX = 1280;
+      var scale = Math.min(1, MAX / Math.max(img.width, img.height));
+      var canvas = document.createElement("canvas");
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+      var dataUrl = canvas.toDataURL("image/jpeg", 0.7);
+      URL.revokeObjectURL(img.src);
+      sendPhoto(dataUrl.split(",")[1]);
+    };
+    img.onerror = function () {
+      photoBtn.disabled = false;
+      photoBtn.textContent = "📷 צרפו תמונה · Add a photo";
+    };
+    img.src = URL.createObjectURL(file);
+  });
+
+  function sendPhoto(base64jpeg) {
+    pushover({
+      title: "Doorbell - photo from the door",
+      message: "תמונה מהדלת 📷",
+      attachment_base64: base64jpeg,
+      attachment_type: "image/jpeg"
+    }).then(function () {
+      photoBtn.textContent = "✓ התמונה נשלחה · Photo sent";
+    }).catch(function () {
+      photoBtn.disabled = false;
+      photoBtn.textContent = "📷 נסו שוב · Try again";
+    });
+  }
+
+  // ── Optional note ──
+  noteBtn.addEventListener("click", function () {
+    var text = note.value.trim();
+    if (!text) return;
+    noteBtn.disabled = true;
+    noteBtn.textContent = "שולח… Sending…";
+    pushover({
+      title: "Doorbell - note from the door",
+      message: text
+    }).then(function () {
+      noteBtn.textContent = "✓ ההודעה נשלחה · Note sent";
+      note.disabled = true;
+    }).catch(function () {
+      noteBtn.disabled = false;
+      noteBtn.textContent = "נסו שוב · Try again";
+    });
   });
 </script>
 </body>
