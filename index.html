@@ -83,6 +83,12 @@
     '#userInfo.displayName=%22Visitor%20at%20the%20door%22' +
     '&config.prejoinConfig.enabled=false';
 
+  // Dan answers peephole-style: his camera starts OFF (he can enable it
+  // mid-call with the camera button); audio stays two-way.
+  var ANSWER_URL = ROOM_URL +
+    '#config.startWithVideoMuted=true' +
+    '&config.prejoinConfig.enabled=false';
+
   var btn = document.getElementById("ring");
   var statusEl = document.getElementById("status");
   var bell = document.getElementById("bellIcon");
@@ -106,7 +112,7 @@
         message: "מישהו בדלת! Someone is at the door 🚪",
         priority: "1",
         sound: "persistent",
-        url: ROOM_URL,
+        url: ANSWER_URL,
         url_title: "Answer the door (video)"
       }).toString()
     }).catch(function () { /* still open the room - the visitor should not be stranded */ });
@@ -120,7 +126,7 @@
         "Title": "Doorbell - someone is at the door",
         "Priority": "urgent",
         "Tags": "bell",
-        "Click": ROOM_URL
+        "Click": ANSWER_URL
       }
     }).catch(function () {});
 
